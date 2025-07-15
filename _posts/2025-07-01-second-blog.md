@@ -1,21 +1,31 @@
-I have always wondered how Intel's AMX support can be used to multiply matrices. I researched around and couldn't find anything that starts with 2 matrices and uses AMX to multiply them[1](https://thoughtsorganized.substack.com/p/using-intels-amxadvanced-matrix-extensions#footnote-1-163968298).
+I have always wondered how Intel's AMX support can be used to multiply matrices. I researched around and couldn't find anything that starts with 2 matrices and uses AMX to multiply them[^1].
 
-In this post, I will take two 1024×1024 matrices, A and B, with elements in **bfloat16** format. These matrices will be divided into tiles of a predefined size. Using AMX instructions, I'll explain tiled matrix multiplication to produce the resulting matrix C. C will have elements in **FP32** format.[2](https://thoughtsorganized.substack.com/p/using-intels-amxadvanced-matrix-extensions#footnote-2-163968298)
+In this post, I will take two 1024×1024 matrices, **A** and **B**, with elements in **bfloat16** format. These matrices will be divided into tiles of a predefined size. Using AMX instructions, I'll explain tiled matrix multiplication to produce the resulting matrix **C**. **C** will have elements in **FP32** format[^2].
 
-**Core Idea**
--------------
+[^1]: AMX (Advanced Matrix Extension) is Intel's ISA extension capability that adds matrix multiplication instructions directly to the hardware. [More info on Wikichip](https://en.wikichip.org/wiki/x86/amx)
+
+[^2]: The AMX `tdpbf16ps` instruction, which we plan to use, takes two tiles of bfloat16 data, performs a matrix multiply, and produces the result in "float" format. This approach strikes a good balance: bfloat16(2 bytes in size) reduces memory bandwidth usage, while the hardware automatically converts the result to float, providing higher precision without additional cost.
+
+
+## Core Idea
 
 For bfloat16 matrix multiplication, I'll use the below intrinsic:
 
-`__tile_dpbf16ps (__tile1024i* dst, __tile1024i src0, __tile1024i src1)`
+```c
+__tile_dpbf16ps (__tile1024i* dst, __tile1024i src0, __tile1024i src1)
+```
+
+## Intrinsic Explanation
 
 Here is the explanation for this intrinsic:
 
-Compute dot-product of BF16 (16-bit) floating-point **pairs** in tiles src0 and src1, accumulating the intermediate single-precision (32-bit) floating-point elements with elements in dst, and store the 32-bit result back to tile dst. The shape of tile is specified in the struct of __tile1024i. The register of the tile is allocated by compiler.
+> Compute dot-product of BF16 (16-bit) floating-point pairs in tiles src0 and src1, accumulating the intermediate single-precision (32-bit) floating-point elements with elements in dst, and store the 32-bit result back to tile dst. The shape of tile is specified in the struct of __tile1024i. The register of the tile is allocated by compiler.
 
-In simple terms, this intrinsic(which translates to `tdpbf16ps `instruction) will perform matrix multiplication between src0 with src1, storing the result in dst. src0, src1 and dst are registers similar to standard x86 registers, with the key difference being that these are 2-dimensional registers.
+In simple terms, this intrinsic (which translates to `tdpbf16ps` instruction) will perform matrix multiplication between `src0` with `src1`, storing the result in `dst`. `src0`, `src1` and `dst` are registers similar to standard x86 registers, with the key difference being that these are 2-dimensional registers.
 
-One thing to emphasize in the quote above is the word "**pairs",** whose usage will be explained below.
+One thing to emphasize in the quote above is the word "pairs", whose usage will be explained below.
+
+## Example
 
 I will start with a simple example of multiplying 2 bfloat16 matrices of size 2x4 and 4x2. The result will be a 2x2 matrix.
 
@@ -110,9 +120,6 @@ The entire source code can be found [here](https://github.com/dilipshivaraju/co
 
 Reminder that this code runs only on Intel processors that has AMX support.
 
-[1](https://thoughtsorganized.substack.com/p/using-intels-amxadvanced-matrix-extensions#footnote-anchor-1-163968298)
-
-AMX(Advanced Matrix Extension) is Intel's ISA extension capability that adds matrix multiplication instructions directly to the hardware. https://en.wikichip.org/wiki/x86/amx
 
 [2](https://thoughtsorganized.substack.com/p/using-intels-amxadvanced-matrix-extensions#footnote-anchor-2-163968298)
 
